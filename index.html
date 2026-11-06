@@ -65,7 +65,7 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:24px}
 .card{background:var(--card);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:transform .3s,box-shadow .3s,opacity .4s;cursor:pointer;border:0;text-align:left;color:inherit;font:inherit;display:block;width:100%}
 .card:hover{box-shadow:0 22px 45px rgba(255,79,139,.25);transform:translateY(-8px) rotate(-.6deg)}
-.card.hide{display:none}
+.card.hide,.card.nopic,.chip.nopic{display:none}
 .card .ph{aspect-ratio:4/3;overflow:hidden;background:linear-gradient(135deg,var(--blue),var(--purple))}
 .card .ph img{width:100%;height:100%;object-fit:cover;transition:transform .6s}
 .card:hover .ph img{transform:scale(1.12) rotate(1.5deg)}
@@ -221,7 +221,8 @@ const grpOf=id=>{const g=GROUPS.find(g=>g[1].includes(id));return g?g[0]:''};
 let fillMore=null;
 document.addEventListener('error',e=>{const im=e.target;if(im.tagName!=='IMG')return;
   if(im.dataset.o){const o=DATA.offers.find(x=>x.id===im.dataset.o);let k=+im.dataset.k+1;
-    if(o&&k<o.i.length){im.dataset.k=k;im.src=src(o.i[k],o.id);return}}
+    if(o&&k<o.i.length){im.dataset.k=k;im.src=src(o.i[k],o.id);return}
+    const c=im.closest('.card');if(c){c.dataset.dead=1;refreshVisibility()}}
   im.remove();if(fillMore)fillMore()},true);
 const mk=(h,c,t)=>{const e=document.createElement(h);if(c)e.className=c;if(t)e.innerHTML=t;return e};
 // Cards + chips
@@ -232,12 +233,17 @@ DATA.offers.forEach(o=>{
   c.onclick=()=>openOffer(o.id,true);cards.appendChild(c);
 });
 ['Всички',...GROUPS.map(g=>g[0])].forEach((n,i)=>{
-  const b=mk('button','chip'+(i?'':' on'),n);
+  const b=mk('button','chip'+(i?'':' on'),n);b.dataset.n=n;
   b.onclick=()=>{chips.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));b.classList.add('on');
     cards.querySelectorAll('.card').forEach(c=>{c.classList.toggle('hide',i&&c.dataset.g!==n);c.classList.add('in')})};
   chips.appendChild(b);
 });
-$('sc').textContent=DATA.offers.length;
+function refreshVisibility(){
+  let n=0;const live={};
+  cards.querySelectorAll('.card').forEach(c=>{const o=DATA.offers.find(x=>x.id===c.dataset.id);const ok=o&&o.i.length>0&&!c.dataset.dead;c.classList.toggle('nopic',!ok);if(ok){n++;live[c.dataset.g]=1}});
+  chips.querySelectorAll('.chip').forEach(b=>{if(b.dataset.n!=='Всички')b.classList.toggle('nopic',!live[b.dataset.n])});
+  $('sc').textContent=n}
+refreshVisibility();
 // About
 $('atext').innerHTML=DATA.about.h;
 const renderAbout=()=>{$('apic').innerHTML='';DATA.about.i.slice(0,6).forEach(p=>{const i=mk('img');i.loading='lazy';i.src=src(p,'za-nas');i.alt='Марина Аниматор';$('apic').appendChild(i)})};renderAbout();
@@ -254,10 +260,10 @@ const GH=(()=>{const m=location.hostname.match(/^([^.]+)\.github\.io$/);if(m){co
 function parseTree(tree){const m={};tree.forEach(t=>{const x=t.type==='blob'&&t.path.match(/^images\/([^/]+)\/([^/]+)$/);if(x&&/\.(jpe?g|png|webp|gif)$/i.test(x[2]))(m[x[1]]=m[x[1]]||[]).push(x[2])});
   Object.values(m).forEach(a=>a.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'})));return m}
 function applyListing(m){
-  DATA.offers.forEach(o=>{if(m[o.id])o.i=m[o.id]});if(m['za-nas']){DATA.about.i=m['za-nas'];renderAbout()}
-  document.querySelectorAll('.card').forEach(c=>{const o=DATA.offers.find(x=>x.id===c.dataset.id);if(!o||!m[o.id])return;
+  DATA.offers.forEach(o=>{o.i=m[o.id]||[]});if(m['za-nas']){DATA.about.i=m['za-nas'];renderAbout()}
+  document.querySelectorAll('.card').forEach(c=>{const o=DATA.offers.find(x=>x.id===c.dataset.id);if(!o)return;delete c.dataset.dead;
     c.querySelector('.ph').innerHTML=o.i[0]?`<img loading="lazy" data-o="${o.id}" data-k="0" src="${src(o.i[0],o.id)}" alt="${o.t}">`:''});
-  if(cur)openOffer(cur.id,false)}
+  refreshVisibility();if(cur)openOffer(cur.id,false)}
 async function loadListing(){if(!GH)return;
   try{let j;try{j=JSON.parse(sessionStorage.getItem('ghl')||'null')}catch(e){}
     if(j&&Date.now()-j.t<120000){applyListing(j.m);return}
